@@ -1,7 +1,7 @@
 <script>
 	import '../app.css';
 	import { onMount } from 'svelte';
-	import { theme } from '$lib/stores/theme.js';
+	import { theme } from '$lib/stores/theme.svelte.js';
 
 	let { children } = $props();
 
@@ -15,6 +15,6 @@
 	<title>PclToon</title>
 </svelte:head>
 
-<div class={$theme}>
+<div class={theme.value}>
 	{@render children()}
 </div>

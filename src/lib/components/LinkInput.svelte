@@ -5,7 +5,7 @@
 	let error = $state('');
 
 	async function handleSubmit(e) {
-		e.preventDefault();
+		if (e?.preventDefault) e.preventDefault();
 		if (!inputValue.trim()) return;
 
 		isLoading = true;
@@ -38,7 +38,15 @@
 		</div>
 
 		{#if error}
-			<p class="text-red-500 text-sm">{error}</p>
+			<div class="flex items-center justify-between text-red-500 text-sm">
+				<p>{error}</p>
+				<button
+					onclick={handleSubmit}
+					class="ml-2 text-blue-500 hover:text-blue-400 underline flex-shrink-0"
+				>
+					Retry
+				</button>
+			</div>
 		{/if}
 
 		<button
