@@ -1,9 +1,9 @@
-<!-- Generated: 2026-09-30 | Updated: 2026-09-30 -->
+<!-- Generated: 2026-09-30 | Updated: 2026-10-01 -->
 
 # pcltoon
 
 ## Purpose
-PclToon is a vertical-scroll comic/webtoon reader for image folders shared via pCloud public links. It is a pure client-side SPA built with SvelteKit + `adapter-static`; there is no backend — the browser calls the pCloud Public API (`api.pcloud.com`) directly. It is deployed to GitHub Pages under the `/PclToon` base path.
+PclToon is a comic/webtoon reader for image folders shared via pCloud public links, with a vertical-scroll mode (webtoon) and a horizontal page-flip mode (book), chosen per series. It is a pure client-side SPA built with SvelteKit + `adapter-static`; there is no backend — the browser calls the pCloud Public API (`api.pcloud.com`) directly. It is deployed to GitHub Pages under the `/PclToon` base path.
 
 ## Key Files
 | File | Description |
@@ -47,7 +47,7 @@ Generated/tooling directories (not documented, git-ignored): `node_modules/`, `.
 - **The URL is the source of truth for navigation**: `?code=<code>&p=<folderid>/<folderid>&view=list` (see `src/lib/nav.js`). Navigate with `goto`, never with local view state.
 - All pCloud API calls live in `src/lib/pcloud.js`.
 - Global state lives in `src/lib/stores/*.svelte.js` as module-scoped `$state` exposed through getter objects.
-- Browser persistence uses `localStorage` only (`theme`, `recent_links`, `bookmark_{code}_{folderId}` = `{ i, f }` page index + fraction). Wrap every access in try/catch.
+- Browser persistence: saved links live in IndexedDB (`pcltoon`/`links`, via `src/lib/db.js`); preferences and reading positions in `localStorage` (`theme`, `reading_modes`, `bookmark_{code}_{folderId}` = `{ i, f }` page index + fraction; `recent_links` only as a legacy/fallback key). Wrap every storage access in try/catch.
 
 ## Dependencies
 
@@ -57,6 +57,6 @@ Generated/tooling directories (not documented, git-ignored): `node_modules/`, `.
 - `tailwindcss` / `@tailwindcss/vite` ^4.1 — styling
 - `vite` ^7.2 — build tool / dev server
 - `vitest` / `@playwright/test` — unit / E2E tests
-- pCloud Public API (`showpublink`, `getpublinkdownload`) — the only runtime external dependency
+- pCloud Public API (`showpublink`, `getpublinkdownload`, `getpubthumblink`) — the only runtime external dependency
 
 <!-- MANUAL: Any manually added notes below this line are preserved on regeneration -->

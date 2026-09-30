@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-30 | Updated: 2026-09-30 -->
+<!-- Generated: 2026-09-30 | Updated: 2026-10-01 -->
 
 # lib
 
@@ -32,7 +32,7 @@ Code imported through the `$lib` alias: the pCloud API client, URL/navigation an
 | Directory | Purpose |
 |-----------|---------|
 | `components/` | Svelte UI components (see `components/AGENTS.md`) |
-| `stores/` | Rune-based global state with `localStorage` persistence (see `stores/AGENTS.md`) |
+| `stores/` | Rune-based global state persisted to IndexedDB (saved links) and `localStorage` (preferences) (see `stores/AGENTS.md`) |
 
 ## For AI Agents
 
