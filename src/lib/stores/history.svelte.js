@@ -1,5 +1,6 @@
 const MAX_HISTORY = 10;
 
+// { code, name, lastAccess, lastPath?: number[], lastName?: string }
 let items = $state([]);
 
 export const history = {
@@ -15,11 +16,27 @@ export const history = {
 		}
 	},
 
+	get(code) {
+		return items.find(item => item.code === code);
+	},
+
 	add(code, name) {
+		const existing = this.get(code);
 		items = [
-			{ code, name, lastAccess: Date.now() },
+			{ ...existing, code, name, lastAccess: Date.now() },
 			...items.filter(item => item.code !== code)
 		].slice(0, MAX_HISTORY);
+		this._save();
+	},
+
+	/** Records the episode last opened in the viewer for resume. */
+	setLast(code, path, name) {
+		const existing = this.get(code);
+		if (!existing) return;
+		if (existing.lastPath?.join('/') === path.join('/')) return;
+		items = items.map(item =>
+			item.code === code ? { ...item, lastPath: [...path], lastName: name } : item
+		);
 		this._save();
 	},
 

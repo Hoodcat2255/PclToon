@@ -1,6 +1,12 @@
 <script>
-	import { onMount } from 'svelte';
-	import { batchFetchImageUrls } from '$lib/pcloud.js';
+	import { onMount, tick, untrack } from 'svelte';
+	import { fetchImageUrls, getImageUrl } from '$lib/pcloud.js';
+	import {
+		computePosition,
+		positionToScroll,
+		loadBookmark,
+		saveBookmark
+	} from '$lib/bookmark.js';
 
 	let {
 		images = [],
@@ -9,109 +15,267 @@
 		onPrevEpisode = null,
 		onNextEpisode = null,
 		hasPrevEpisode = false,
-		hasNextEpisode = false
+		hasNextEpisode = false,
+		onTap = null
 	} = $props();
 
-	let imageUrls = $state([]);
-	let loadedCount = $state(0);
-	let fetchProgress = $state(0);
-	let fetchTotal = $state(0);
-	let containerRef = $state(null);
+	const RESTORE_TIMEOUT_MS = 15000;
+	const SAVE_THROTTLE_MS = 300;
 
-	function handleImageLoad() {
-		loadedCount++;
+	// The parent re-creates this component per folder ({#key}), so `images` is
+	// fixed for the lifetime of an instance.
+	// status: 'pending' (resolving URL) | 'ready' (URL set) | 'loaded' | 'error'
+	let pages = $state(untrack(() => images).map(() => ({ url: null, status: 'pending', retried: false })));
+	let loadedCount = $derived(pages.filter((page) => page.status === 'loaded').length);
+
+	/** @type {HTMLElement[]} */
+	const pageEls = [];
+	let containerEl;
+
+	// Pending bookmark restore. While set, saving is paused so the initial
+	// scrollY of 0 does not overwrite the stored position.
+	let restoreTarget = null;
+	// Pages up to this index load eagerly so a restore target deep in the
+	// episode gets its preceding layout.
+	let eagerUntil = $state(-1);
+	let lastPosition = null;
+
+	const hasDimensions = (image) => image.width > 0 && image.height > 0;
+
+	function pageBoxes() {
+		return pageEls.map((el) => {
+			const rect = el.getBoundingClientRect();
+			return { top: rect.top + window.scrollY, height: rect.height };
+		});
 	}
 
-	function savePosition() {
-		if (folderId) {
-			try {
-				localStorage.setItem(`bookmark_${code}_${folderId}`, window.scrollY.toString());
-			} catch {
-				// localStorage 용량 초과 시 무시
+	function hasLayout(i) {
+		return hasDimensions(images[i]) || pages[i].status === 'loaded' || pages[i].status === 'error';
+	}
+
+	function cancelRestore() {
+		restoreTarget = null;
+		eagerUntil = -1;
+	}
+
+	async function tryRestore({ force = false } = {}) {
+		if (!restoreTarget) return;
+		if (!force) {
+			for (let j = 0; j <= restoreTarget.i; j++) {
+				if (!hasLayout(j)) return;
 			}
 		}
+		// Wait for layout, then one frame so SvelteKit's post-navigation scroll
+		// reset has already happened.
+		await tick();
+		await new Promise(requestAnimationFrame);
+		if (!restoreTarget) return;
+		window.scrollTo(0, positionToScroll(restoreTarget, pageBoxes()[restoreTarget.i]));
+		cancelRestore();
+		trackPosition();
 	}
 
-	onMount(async () => {
-		const savedPosition = localStorage.getItem(`bookmark_${code}_${folderId}`);
-		fetchTotal = images.length;
+	function trackPosition() {
+		if (restoreTarget || !pageEls[0]?.isConnected) return;
+		lastPosition = computePosition(pageBoxes(), window.scrollY);
+	}
 
-		imageUrls = await batchFetchImageUrls(images, code, 5, (loaded, total) => {
-			fetchProgress = loaded;
-			fetchTotal = total;
+	function persistPosition() {
+		if (!restoreTarget) saveBookmark(code, folderId, lastPosition);
+	}
+
+	function updatePosition() {
+		trackPosition();
+		persistPosition();
+	}
+
+	function handleLoad(i) {
+		pages[i].status = 'loaded';
+		tryRestore();
+	}
+
+	async function handleError(i) {
+		const page = pages[i];
+		// Download links expire; resolve a fresh original once before giving up.
+		if (!page.retried) {
+			page.retried = true;
+			try {
+				const url = await getImageUrl(code, images[i].fileid);
+				// Drop the <img> first so the browser re-requests even if the URL is unchanged.
+				page.url = null;
+				await tick();
+				page.url = url;
+				return;
+			} catch (err) {
+				console.warn(`Refetch failed for ${images[i].name}:`, err);
+			}
+		}
+		page.status = 'error';
+		tryRestore();
+	}
+
+	async function retryPage(i) {
+		pages[i] = { url: null, status: 'pending', retried: true };
+		try {
+			pages[i].url = await getImageUrl(code, images[i].fileid);
+			pages[i].status = 'ready';
+		} catch (err) {
+			console.warn(`Retry failed for ${images[i].name}:`, err);
+			pages[i].status = 'error';
+		}
+	}
+
+	onMount(() => {
+		const signal = { cancelled: false };
+		let saveTimer = null;
+
+		const saved = folderId ? loadBookmark(code, folderId) : null;
+		if (saved && saved.i < images.length && (saved.i > 0 || saved.f > 0)) {
+			restoreTarget = saved;
+			eagerUntil = saved.i;
+		}
+		// Slow networks: jump to the best estimate rather than dropping the bookmark.
+		const restoreTimeout = setTimeout(() => tryRestore({ force: true }), RESTORE_TIMEOUT_MS);
+
+		// Pages are capped at max-w-3xl, so size thumbnails to a page, not the window.
+		const pageWidth = pageEls[0]?.clientWidth ?? containerEl.clientWidth;
+		const targetWidth = Math.round(pageWidth * (window.devicePixelRatio || 1));
+		fetchImageUrls(images, code, {
+			targetWidth,
+			signal,
+			onItem(i, url) {
+				if (url) {
+					pages[i].url = url;
+					pages[i].status = 'ready';
+				} else {
+					pages[i].status = 'error';
+					tryRestore();
+				}
+			}
 		});
+		tryRestore();
 
-		if (savedPosition && containerRef) {
-			setTimeout(() => {
-				window.scrollTo(0, parseInt(savedPosition, 10));
-			}, 100);
+		// Track the position every frame so it is current at teardown (the DOM is
+		// already detached by then); write to storage less often.
+		let frame = 0;
+		function onScroll() {
+			if (!frame) {
+				frame = requestAnimationFrame(() => {
+					frame = 0;
+					trackPosition();
+				});
+			}
+			if (saveTimer) return;
+			saveTimer = setTimeout(() => {
+				saveTimer = null;
+				persistPosition();
+			}, SAVE_THROTTLE_MS);
+		}
+		// Mobile browsers rarely fire beforeunload; persist when the page is
+		// hidden or unloaded instead.
+		function onVisibility() {
+			if (document.visibilityState === 'hidden') updatePosition();
 		}
 
-		window.addEventListener('beforeunload', savePosition);
+		window.addEventListener('scroll', onScroll, { passive: true });
+		document.addEventListener('visibilitychange', onVisibility);
+		window.addEventListener('pagehide', updatePosition);
+		// The user scrolling by hand takes precedence over a pending restore.
+		window.addEventListener('touchstart', cancelRestore, { passive: true });
+		window.addEventListener('wheel', cancelRestore, { passive: true });
+
 		return () => {
-			savePosition();
-			window.removeEventListener('beforeunload', savePosition);
+			signal.cancelled = true;
+			clearTimeout(saveTimer);
+			clearTimeout(restoreTimeout);
+			cancelAnimationFrame(frame);
+			persistPosition();
+			window.removeEventListener('scroll', onScroll);
+			document.removeEventListener('visibilitychange', onVisibility);
+			window.removeEventListener('pagehide', updatePosition);
+			window.removeEventListener('touchstart', cancelRestore);
+			window.removeEventListener('wheel', cancelRestore);
 		};
 	});
 </script>
 
-<div bind:this={containerRef} class="min-h-screen bg-black">
-	{#if imageUrls.length === 0}
-		<div class="flex items-center justify-center h-64">
-			<div class="text-center text-gray-400">
-				<svg class="animate-spin h-8 w-8 mx-auto mb-4" viewBox="0 0 24 24">
-					<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" />
-					<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-				</svg>
-				{#if fetchTotal > 0}
-					<p>Loading images... {fetchProgress} / {fetchTotal}</p>
-				{:else}
-					<p>Loading images...</p>
+<div bind:this={containerEl} class="min-h-dvh bg-black">
+	<!-- Tapping the page toggles the header for distraction-free reading; keyboard
+	     users get the header back by scrolling up, so no key handler is needed. -->
+	<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+	<div class="flex flex-col items-center" onclick={() => onTap?.()}>
+		{#each images as image, i (image.fileid)}
+			{@const page = pages[i]}
+			<div
+				bind:this={pageEls[i]}
+				data-page={i}
+				class="relative w-full max-w-3xl {page.status === 'loaded' || hasDimensions(image) ? '' : page.status === 'error' ? 'min-h-[30dvh]' : 'min-h-[60dvh]'}"
+				style={hasDimensions(image) && page.status !== 'loaded' ? `aspect-ratio: ${image.width} / ${image.height}` : ''}
+			>
+				{#if page.url && page.status !== 'error'}
+					<img
+						src={page.url}
+						alt="Page {i + 1}"
+						width={image.width || undefined}
+						height={image.height || undefined}
+						loading={i <= eagerUntil ? 'eager' : 'lazy'}
+						decoding="async"
+						onload={() => handleLoad(i)}
+						onerror={() => handleError(i)}
+						class="block w-full h-auto"
+					/>
+				{/if}
+				{#if page.status === 'error'}
+					<div class="absolute inset-0 flex flex-col items-center justify-center gap-3 text-gray-400 text-sm">
+						<p>Page {i + 1} failed to load</p>
+						<button
+							type="button"
+							onclick={(e) => {
+								e.stopPropagation();
+								retryPage(i);
+							}}
+							class="px-4 py-3 rounded-lg bg-gray-800 text-white hover:bg-gray-700 transition-colors"
+						>
+							Retry
+						</button>
+					</div>
+				{:else if page.status !== 'loaded'}
+					<div class="absolute inset-0 flex items-center justify-center text-gray-600 text-sm animate-pulse">
+						Page {i + 1}
+					</div>
 				{/if}
 			</div>
-		</div>
-	{:else}
-		<div class="flex flex-col items-center">
-			{#each imageUrls as url, i (url)}
-				<img
-					src={url}
-					alt="Page {i + 1}"
-					loading="lazy"
-					onload={handleImageLoad}
-					class="w-full max-w-3xl"
-				/>
-			{/each}
-		</div>
+		{/each}
+	</div>
 
-		{#if hasPrevEpisode || hasNextEpisode}
-			<div class="flex items-center justify-center gap-4 py-8 px-4">
-				<button
-					onclick={onPrevEpisode}
-					disabled={!hasPrevEpisode}
-					class="flex items-center gap-2 px-6 py-3 rounded-lg text-white transition-colors {hasPrevEpisode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-800 opacity-40 cursor-not-allowed'}"
-				>
-					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-					</svg>
-					Prev
-				</button>
-				<button
-					onclick={onNextEpisode}
-					disabled={!hasNextEpisode}
-					class="flex items-center gap-2 px-6 py-3 rounded-lg text-white transition-colors {hasNextEpisode ? 'bg-blue-600 hover:bg-blue-500' : 'bg-gray-800 opacity-40 cursor-not-allowed'}"
-				>
-					Next
-					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-					</svg>
-				</button>
-			</div>
-		{/if}
+	{#if hasPrevEpisode || hasNextEpisode}
+		<div class="flex items-center justify-center gap-4 py-8 px-4">
+			<button
+				onclick={onPrevEpisode}
+				disabled={!hasPrevEpisode}
+				class="flex items-center gap-2 px-6 py-3 rounded-lg text-white transition-colors {hasPrevEpisode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-800 opacity-40 cursor-not-allowed'}"
+			>
+				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+				</svg>
+				Prev
+			</button>
+			<button
+				onclick={onNextEpisode}
+				disabled={!hasNextEpisode}
+				class="flex items-center gap-2 px-6 py-3 rounded-lg text-white transition-colors {hasNextEpisode ? 'bg-blue-600 hover:bg-blue-500' : 'bg-gray-800 opacity-40 cursor-not-allowed'}"
+			>
+				Next
+				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+				</svg>
+			</button>
+		</div>
+	{/if}
 
-		{#if loadedCount < imageUrls.length}
-			<div class="fixed bottom-4 right-4 bg-black/70 text-white px-3 py-2 rounded-lg text-sm">
-				{loadedCount} / {imageUrls.length}
-			</div>
-		{/if}
+	{#if loadedCount < images.length}
+		<div class="fixed bottom-4 right-4 bg-black/70 text-white px-3 py-2 rounded-lg text-sm pointer-events-none">
+			{loadedCount} / {images.length}
+		</div>
 	{/if}
 </div>

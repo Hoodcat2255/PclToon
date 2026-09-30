@@ -1,16 +1,18 @@
 <script>
 	import ThemeToggle from './ThemeToggle.svelte';
 
-	let { title = 'pCloud Comics', showBack = false, onBack = () => {} } = $props();
+	let { title = 'PclToon', showBack = false, onBack = () => {}, hidden = false } = $props();
 </script>
 
-<header class="sticky top-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700">
-	<div class="flex items-center justify-between px-4 py-3">
-		<div class="flex items-center gap-3">
+<header
+	class="sticky top-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 transition-transform duration-200 {hidden ? '-translate-y-full' : ''}"
+>
+	<div class="flex items-center justify-between px-4 py-1">
+		<div class="flex items-center gap-1 min-w-0">
 			{#if showBack}
 				<button
 					onclick={onBack}
-					class="p-2 -ml-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+					class="p-3 -ml-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
 					aria-label="Go back"
 				>
 					<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

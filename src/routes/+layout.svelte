@@ -3,6 +3,8 @@
 	import { onMount } from 'svelte';
 	import { theme } from '$lib/stores/theme.svelte.js';
 
+	const THEME_COLORS = { dark: '#111827', light: '#ffffff' };
+
 	let { children } = $props();
 
 	onMount(() => {
@@ -11,8 +13,8 @@
 </script>
 
 <svelte:head>
-	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 	<title>PclToon</title>
+	<meta name="theme-color" content={theme.value === 'dark' ? THEME_COLORS.dark : THEME_COLORS.light} />
 </svelte:head>
 
 <div class={theme.value}>

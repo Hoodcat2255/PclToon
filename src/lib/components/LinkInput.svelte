@@ -4,6 +4,8 @@
 	let isLoading = $state(false);
 	let error = $state('');
 
+	const canPaste = typeof navigator !== 'undefined' && !!navigator.clipboard?.readText;
+
 	async function handleSubmit(e) {
 		if (e?.preventDefault) e.preventDefault();
 		if (!inputValue.trim()) return;
@@ -19,6 +21,18 @@
 			isLoading = false;
 		}
 	}
+
+	async function handlePaste() {
+		try {
+			const text = (await navigator.clipboard.readText()).trim();
+			if (!text) return;
+			inputValue = text;
+			await handleSubmit();
+		} catch (err) {
+			error = 'Clipboard access was denied. Paste the link manually.';
+			console.warn('Clipboard read failed:', err);
+		}
+	}
 </script>
 
 <form onsubmit={handleSubmit} class="w-full max-w-md mx-auto p-4">
@@ -27,22 +41,41 @@
 			<label for="pcloud-link" class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
 				pCloud Public Link
 			</label>
-			<input
-				id="pcloud-link"
-				type="text"
-				bind:value={inputValue}
-				placeholder="https://e.pcloud.link/publink/show?code=..."
-				class="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-				disabled={isLoading}
-			/>
+			<div class="flex gap-2">
+				<input
+					id="pcloud-link"
+					type="text"
+					inputmode="url"
+					autocapitalize="off"
+					autocorrect="off"
+					autocomplete="off"
+					spellcheck="false"
+					enterkeyhint="go"
+					bind:value={inputValue}
+					placeholder="https://e.pcloud.link/publink/show?code=..."
+					class="min-w-0 flex-1 px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+					disabled={isLoading}
+				/>
+				{#if canPaste}
+					<button
+						type="button"
+						onclick={handlePaste}
+						disabled={isLoading}
+						class="flex-shrink-0 px-4 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-sm font-medium transition-colors disabled:opacity-50"
+					>
+						Paste
+					</button>
+				{/if}
+			</div>
 		</div>
 
 		{#if error}
 			<div class="flex items-center justify-between text-red-500 text-sm">
 				<p>{error}</p>
 				<button
+					type="button"
 					onclick={handleSubmit}
-					class="ml-2 text-blue-500 hover:text-blue-400 underline flex-shrink-0"
+					class="ml-2 px-2 py-2 text-blue-500 hover:text-blue-400 underline flex-shrink-0"
 				>
 					Retry
 				</button>
