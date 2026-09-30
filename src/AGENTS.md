@@ -22,7 +22,7 @@ SvelteKit application source root: HTML shell, global CSS, routes, and `$lib` mo
 
 ### Working In This Directory
 - Dark mode is class-based: `+layout.svelte` applies `dark` to the root `<div class={theme.value}>`. When touching theming, confirm Tailwind's `dark:` variant still keys off this class.
-- The viewport meta in `app.html` is overridden in `+layout.svelte`'s `<svelte:head>` to disable zoom (`user-scalable=no`).
+- `app.html` holds the only viewport meta (pinch-zoom allowed — do not add `maximum-scale`/`user-scalable`) plus the favicon, apple-touch-icon and manifest links (`%sveltekit.assets%` resolves the `/PclToon` base).
 
 ### Testing Requirements
 - `npm run build` passes; toggle light/dark in `npm run dev`.
