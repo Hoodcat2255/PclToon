@@ -123,20 +123,27 @@ export async function getDisplayUrl(code, image, size) {
 	return getImageUrl(code, image.fileid);
 }
 
+/** Page indices starting at `startAt` and wrapping around, so a resumed page loads first. */
+export function fetchOrder(count, startAt = 0) {
+	const start = Math.min(Math.max(startAt, 0), Math.max(count - 1, 0));
+	return Array.from({ length: count }, (_, k) => (start + k) % count);
+}
+
 /**
- * Resolves display URLs in page order with `concurrency` requests in flight,
- * reporting each through `onItem(index, url | null)` as soon as it arrives so
- * pages render progressively. Stops when `signal.cancelled` becomes true.
+ * Resolves display URLs with `concurrency` requests in flight, starting at
+ * `startAt`, reporting each through `onItem(index, url | null)` as soon as it
+ * arrives so pages render progressively. Stops when `signal.cancelled` is set.
  */
 export async function fetchImageUrls(
 	images,
 	code,
-	{ concurrency = 5, targetWidth = 0, onItem, signal = { cancelled: false } } = {}
+	{ concurrency = 5, targetWidth = 0, startAt = 0, onItem, signal = { cancelled: false } } = {}
 ) {
+	const order = fetchOrder(images.length, startAt);
 	let next = 0;
 	async function worker() {
-		while (!signal.cancelled && next < images.length) {
-			const index = next++;
+		while (!signal.cancelled && next < order.length) {
+			const index = order[next++];
 			const image = images[index];
 			let url = null;
 			try {

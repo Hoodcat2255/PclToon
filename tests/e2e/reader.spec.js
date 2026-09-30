@@ -140,9 +140,12 @@ test('reading position is saved when leaving the episode in-app', async ({ page 
 	await pageImage(page, 6).scrollIntoViewIfNeeded();
 	const before = await page.evaluate(() => window.scrollY);
 
-	// Scrolling down hid the header; tap to bring it back like a reader would.
-	await page.touchscreen.tap(200, 400);
+	// If scrolling hid the header, tap to bring it back like a reader would.
+	if (await header(page).evaluate((el) => el.className.includes('-translate-y-full'))) {
+		await page.touchscreen.tap(200, 400);
+	}
 	await expect(header(page)).not.toHaveClass(/-translate-y-full/);
+	await expect.poll(async () => (await header(page).boundingBox()).y).toBe(0);
 	await page.getByRole('button', { name: 'Go back' }).click();
 	await expect(episode(page, 'Ep 1')).toBeVisible();
 	await episode(page, 'Ep 1').click();

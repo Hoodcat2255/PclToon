@@ -1,7 +1,7 @@
 <script>
 	import ThemeToggle from './ThemeToggle.svelte';
 
-	let { title = 'PclToon', showBack = false, onBack = () => {}, hidden = false } = $props();
+	let { title = 'PclToon', showBack = false, onBack = () => {}, hidden = false, actions = null } = $props();
 </script>
 
 <header
@@ -22,6 +22,9 @@
 			{/if}
 			<h1 class="text-lg font-semibold truncate">{title}</h1>
 		</div>
-		<ThemeToggle />
+		<div class="flex items-center gap-2 flex-shrink-0">
+			{@render actions?.()}
+			<ThemeToggle />
+		</div>
 	</div>
 </header>

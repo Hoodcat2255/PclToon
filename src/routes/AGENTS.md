@@ -18,7 +18,8 @@ SvelteKit routes. The app is a single route (`/`); which screen is shown (input 
 - Effects: fetch the tree when the URL's code is not loaded (errors → `loadError` on the input view); redirect stale paths to the deepest existing folder; record last-read path; auto-hide the header while scrolling down in the viewer.
 - Navigation goes through `navigate(target, { replace, fromParent })` → `goto`. `page.state.fromParent` marks entries pushed from their parent, so header back uses `history.back()` only then; otherwise (deep link, resume) it replaces the entry with the parent URL. Episode Prev/Next replaces the entry.
 - A folder with both images and subfolders opens its viewer; back from there switches to its list (`view=list`).
-- Keyboard: `Escape`/`Backspace` back, `Home`/`End` in viewer.
+- Reading mode: `mode = readingMode.get(route.code)` is passed to `ImageViewer`; the header `actions` snippet renders the toggle (viewer only). In paged mode `onPageTurn` hides the header.
+- Keyboard: `Escape`/`Backspace` back, `Home`/`End` in viewer (paged mode adds arrows/PageUp/PageDown in `PageFlipper`).
 
 ## For AI Agents
 

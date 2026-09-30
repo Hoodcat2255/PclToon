@@ -10,6 +10,7 @@
 	import { extractCode, fetchPublicLink, classifyContents } from '$lib/pcloud.js';
 	import { parseSearch, buildSearch, resolvePath, defaultView } from '$lib/nav.js';
 	import { history as recent } from '$lib/stores/history.svelte.js';
+	import { readingMode } from '$lib/stores/reading-mode.svelte.js';
 
 	const HEADER_HIDE_OFFSET = 80;
 	const SCROLL_DELTA = 8;
@@ -121,6 +122,12 @@
 		let lastY = window.scrollY;
 		function onScroll() {
 			const y = window.scrollY;
+			// Jumps of more than a screen are programmatic (bookmark restore, mode
+			// switch), not the reader scrolling; leave the header as it is.
+			if (Math.abs(y - lastY) > window.innerHeight) {
+				lastY = y;
+				return;
+			}
 			if (y > lastY + SCROLL_DELTA && y > HEADER_HIDE_OFFSET) headerHidden = true;
 			else if (y < lastY - SCROLL_DELTA) headerHidden = false;
 			if (Math.abs(y - lastY) > SCROLL_DELTA) lastY = y;
@@ -129,8 +136,11 @@
 		return () => window.removeEventListener('scroll', onScroll);
 	});
 
+	let mode = $derived(route.code ? readingMode.get(route.code) : 'vertical');
+
 	onMount(() => {
 		recent.init();
+		readingMode.init();
 	});
 
 	async function handleLinkSubmit(url) {
@@ -187,14 +197,15 @@
 				e.preventDefault();
 				handleBack();
 				break;
+			// Paged mode handles Home/End itself (PageFlipper).
 			case 'Home':
-				if (currentView === 'viewer') {
+				if (currentView === 'viewer' && mode === 'vertical') {
 					e.preventDefault();
 					window.scrollTo({ top: 0, behavior: 'smooth' });
 				}
 				break;
 			case 'End':
-				if (currentView === 'viewer') {
+				if (currentView === 'viewer' && mode === 'vertical') {
 					e.preventDefault();
 					window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
 				}
@@ -211,7 +222,29 @@
 		showBack={currentView !== 'input'}
 		onBack={handleBack}
 		hidden={headerHidden}
+		actions={currentView === 'viewer' ? modeToggle : null}
 	/>
+
+	{#snippet modeToggle()}
+		<button
+			onclick={() => readingMode.toggle(route.code)}
+			class="p-3 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+			aria-label={mode === 'paged' ? 'Switch to scroll mode' : 'Switch to page mode'}
+			title={mode === 'paged' ? 'Scroll mode' : 'Page mode'}
+		>
+			{#if mode === 'paged'}
+				<!-- Currently paging left/right: show the book icon. -->
+				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.5C10.5 5.5 8 5 5 5v13c3 0 5.5.5 7 1.5m0-13c1.5-1 4-1.5 7-1.5v13c-3 0-5.5.5-7 1.5m0-13v13" />
+				</svg>
+			{:else}
+				<!-- Currently scrolling vertically: show the up/down arrows. -->
+				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7l4-4 4 4M8 17l4 4 4-4M12 3v18" />
+				</svg>
+			{/if}
+		</button>
+	{/snippet}
 
 	{#if currentView === 'input'}
 		<div class="flex flex-col items-center justify-center min-h-[80dvh]">
@@ -282,7 +315,9 @@
 				{hasPrevEpisode}
 				{hasNextEpisode}
 				chromeVisible={!headerHidden}
+				{mode}
 				onTap={() => (headerHidden = !headerHidden)}
+				onPageTurn={() => (headerHidden = true)}
 			/>
 		{/key}
 	{/if}

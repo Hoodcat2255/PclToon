@@ -2,6 +2,9 @@
 	import { onMount, tick, untrack } from 'svelte';
 	import { fetchImageUrls, getImageUrl } from '$lib/pcloud.js';
 	import FastScroller from './FastScroller.svelte';
+	import PageFlipper from './PageFlipper.svelte';
+	import EpisodeNav from './EpisodeNav.svelte';
+	import PageStatus from './PageStatus.svelte';
 	import {
 		computePosition,
 		positionToScroll,
@@ -18,7 +21,9 @@
 		hasPrevEpisode = false,
 		hasNextEpisode = false,
 		chromeVisible = true,
-		onTap = null
+		mode = 'vertical',
+		onTap = null,
+		onPageTurn = null
 	} = $props();
 
 	const RESTORE_TIMEOUT_MS = 15000;
@@ -31,7 +36,6 @@
 
 	/** @type {HTMLElement[]} */
 	const pageEls = [];
-	let containerEl;
 
 	// Pending bookmark restore. While set, saving is paused so the initial
 	// scrollY of 0 does not overwrite the stored position.
@@ -40,6 +44,18 @@
 	// episode gets its preceding layout.
 	let eagerUntil = $state(-1);
 	let lastPosition = null;
+
+	// Read before mounting: children (PageFlipper) mount before this component's
+	// onMount runs, so their start page must already be known.
+	const saved = untrack(() => {
+		const loaded = folderId ? loadBookmark(code, folderId) : null;
+		return loaded && loaded.i < images.length ? loaded : null;
+	});
+
+	// Layout currently rendered; follows `mode`, carrying the reading position over.
+	let layout = $state(untrack(() => mode));
+	let pagedIndex = $state(saved?.i ?? 0);
+	let pagedStart = $state(saved?.i ?? 0);
 
 	const hasDimensions = (image) => image.width > 0 && image.height > 0;
 
@@ -82,11 +98,44 @@
 	}
 
 	function persistPosition() {
-		if (!restoreTarget) saveBookmark(code, folderId, lastPosition);
+		if (layout === 'paged') saveBookmark(code, folderId, { i: pagedIndex, f: 0 });
+		else if (!restoreTarget) saveBookmark(code, folderId, lastPosition);
 	}
 
 	function updatePosition() {
 		trackPosition();
+		persistPosition();
+	}
+
+	// Slow networks: jump to the best estimate rather than dropping the bookmark.
+	let restoreTimeout;
+	function armRestoreTimeout() {
+		clearTimeout(restoreTimeout);
+		restoreTimeout = setTimeout(() => tryRestore({ force: true }), RESTORE_TIMEOUT_MS);
+	}
+
+	function switchLayout(next) {
+		if (next === layout) return;
+		if (next === 'paged') {
+			trackPosition();
+			pagedStart = pagedIndex = (restoreTarget ?? lastPosition)?.i ?? 0;
+			cancelRestore();
+		} else {
+			restoreTarget = { i: pagedIndex, f: 0 };
+			eagerUntil = pagedIndex;
+			armRestoreTimeout();
+		}
+		layout = next;
+		if (next === 'vertical') tryRestore();
+	}
+
+	$effect(() => {
+		const next = mode;
+		untrack(() => switchLayout(next));
+	});
+
+	function handlePagedIndex(i) {
+		pagedIndex = i;
 		persistPosition();
 	}
 
@@ -135,19 +184,19 @@
 		const signal = { cancelled: false };
 		let saveTimer = null;
 
-		const saved = folderId ? loadBookmark(code, folderId) : null;
-		if (saved && saved.i < images.length && (saved.i > 0 || saved.f > 0)) {
+		if (layout === 'vertical' && saved && (saved.i > 0 || saved.f > 0)) {
 			restoreTarget = saved;
 			eagerUntil = saved.i;
 		}
-		// Slow networks: jump to the best estimate rather than dropping the bookmark.
-		const restoreTimeout = setTimeout(() => tryRestore({ force: true }), RESTORE_TIMEOUT_MS);
+		armRestoreTimeout();
 
-		// Pages are capped at max-w-3xl, so size thumbnails to a page, not the window.
-		const pageWidth = pageEls[0]?.clientWidth ?? containerEl.clientWidth;
+		// Vertical pages are capped at max-w-3xl, so size thumbnails to a page;
+		// paged mode uses the full screen width.
+		const pageWidth = pageEls[0]?.clientWidth ?? window.innerWidth;
 		const targetWidth = Math.round(pageWidth * (window.devicePixelRatio || 1));
 		fetchImageUrls(images, code, {
 			targetWidth,
+			startAt: saved?.i ?? 0,
 			signal,
 			onItem(i, url) {
 				if (url) {
@@ -205,79 +254,59 @@
 	});
 </script>
 
-<div bind:this={containerEl} class="min-h-dvh bg-black">
-	<!-- Tapping the page toggles the header for distraction-free reading; keyboard
-	     users get the header back by scrolling up, so no key handler is needed. -->
-	<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-	<div id="episode-pages" class="flex flex-col items-center" onclick={() => onTap?.()}>
-		{#each images as image, i (image.fileid)}
-			{@const page = pages[i]}
-			<div
-				bind:this={pageEls[i]}
-				data-page={i}
-				class="relative w-full max-w-3xl {page.status === 'loaded' || hasDimensions(image) ? '' : page.status === 'error' ? 'min-h-[30dvh]' : 'min-h-[60dvh]'}"
-				style={hasDimensions(image) && page.status !== 'loaded' ? `aspect-ratio: ${image.width} / ${image.height}` : ''}
-			>
-				{#if page.url && page.status !== 'error'}
-					<img
-						src={page.url}
-						alt="Page {i + 1}"
-						width={image.width || undefined}
-						height={image.height || undefined}
-						loading={i <= eagerUntil ? 'eager' : 'lazy'}
-						decoding="async"
-						onload={() => handleLoad(i)}
-						onerror={() => handleError(i)}
-						class="block w-full h-auto"
-					/>
-				{/if}
-				{#if page.status === 'error'}
-					<div class="absolute inset-0 flex flex-col items-center justify-center gap-3 text-gray-400 text-sm">
-						<p>Page {i + 1} failed to load</p>
-						<button
-							type="button"
-							onclick={(e) => {
-								e.stopPropagation();
-								retryPage(i);
-							}}
-							class="px-4 py-3 rounded-lg bg-gray-800 text-white hover:bg-gray-700 transition-colors"
-						>
-							Retry
-						</button>
-					</div>
-				{:else if page.status !== 'loaded'}
-					<div class="absolute inset-0 flex items-center justify-center text-gray-600 text-sm animate-pulse">
-						Page {i + 1}
-					</div>
-				{/if}
-			</div>
-		{/each}
-	</div>
-
-	{#if hasPrevEpisode || hasNextEpisode}
-		<div class="flex items-center justify-center gap-4 py-8 px-4">
-			<button
-				onclick={onPrevEpisode}
-				disabled={!hasPrevEpisode}
-				class="flex items-center gap-2 px-6 py-3 rounded-lg text-white transition-colors {hasPrevEpisode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-800 opacity-40 cursor-not-allowed'}"
-			>
-				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-				</svg>
-				Prev
-			</button>
-			<button
-				onclick={onNextEpisode}
-				disabled={!hasNextEpisode}
-				class="flex items-center gap-2 px-6 py-3 rounded-lg text-white transition-colors {hasNextEpisode ? 'bg-blue-600 hover:bg-blue-500' : 'bg-gray-800 opacity-40 cursor-not-allowed'}"
-			>
-				Next
-				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-				</svg>
-			</button>
+{#if layout === 'paged'}
+	<PageFlipper
+		{images}
+		{pages}
+		startIndex={pagedStart}
+		{chromeVisible}
+		{hasPrevEpisode}
+		{hasNextEpisode}
+		{onPrevEpisode}
+		{onNextEpisode}
+		onIndexChange={handlePagedIndex}
+		{onPageTurn}
+		{onTap}
+		onImageLoad={handleLoad}
+		onImageError={handleError}
+		onRetry={retryPage}
+	/>
+{:else}
+	<div class="min-h-dvh bg-black">
+		<!-- Tapping the page toggles the header for distraction-free reading; keyboard
+		     users get the header back by scrolling up, so no key handler is needed. -->
+		<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+		<div id="episode-pages" class="flex flex-col items-center" onclick={() => onTap?.()}>
+			{#each images as image, i (image.fileid)}
+				{@const page = pages[i]}
+				<div
+					bind:this={pageEls[i]}
+					data-page={i}
+					class="relative w-full max-w-3xl {page.status === 'loaded' || hasDimensions(image) ? '' : page.status === 'error' ? 'min-h-[30dvh]' : 'min-h-[60dvh]'}"
+					style={hasDimensions(image) && page.status !== 'loaded' ? `aspect-ratio: ${image.width} / ${image.height}` : ''}
+				>
+					{#if page.url && page.status !== 'error'}
+						<img
+							src={page.url}
+							alt="Page {i + 1}"
+							width={image.width || undefined}
+							height={image.height || undefined}
+							loading={i <= eagerUntil ? 'eager' : 'lazy'}
+							decoding="async"
+							onload={() => handleLoad(i)}
+							onerror={() => handleError(i)}
+							class="block w-full h-auto"
+						/>
+					{/if}
+					<PageStatus index={i} status={page.status} onRetry={() => retryPage(i)} />
+				</div>
+			{/each}
 		</div>
-	{/if}
 
-	<FastScroller pageLabel={currentPageLabel} onDragStart={cancelRestore} pinned={chromeVisible} />
-</div>
+		{#if hasPrevEpisode || hasNextEpisode}
+			<EpisodeNav hasPrev={hasPrevEpisode} hasNext={hasNextEpisode} onPrev={onPrevEpisode} onNext={onNextEpisode} />
+		{/if}
+
+		<FastScroller pageLabel={currentPageLabel} onDragStart={cancelRestore} pinned={chromeVisible} />
+	</div>
+{/if}

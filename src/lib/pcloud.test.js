@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractCode, thumbSize, classifyContents } from './pcloud.js';
+import { extractCode, thumbSize, classifyContents, fetchOrder } from './pcloud.js';
 
 describe('extractCode', () => {
 	it('reads the code from share URLs and bare codes', () => {
@@ -51,5 +51,18 @@ describe('classifyContents', () => {
 		]);
 		expect(folders.map((f) => f.name)).toEqual(['Ep 2', 'Ep 10']);
 		expect(images.map((f) => f.name)).toEqual(['2.PNG', '10.jpg']);
+	});
+});
+
+describe('fetchOrder', () => {
+	it('starts at the resume page and wraps around', () => {
+		expect(fetchOrder(5, 2)).toEqual([2, 3, 4, 0, 1]);
+	});
+
+	it('defaults to page order and clamps out-of-range starts', () => {
+		expect(fetchOrder(3)).toEqual([0, 1, 2]);
+		expect(fetchOrder(3, 9)).toEqual([2, 0, 1]);
+		expect(fetchOrder(3, -1)).toEqual([0, 1, 2]);
+		expect(fetchOrder(0, 4)).toEqual([]);
 	});
 });

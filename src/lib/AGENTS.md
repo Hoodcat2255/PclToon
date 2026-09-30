@@ -23,7 +23,8 @@ Code imported through the `$lib` alias: the pCloud API client, URL/navigation an
 | `getImageUrl(code, fileid)` | `getpublinkdownload` → original image URL |
 | `getDisplayUrl(code, image, size)` | `getpubthumblink` when `size` is given, falling back to the original on any failure |
 | `thumbSize(image, targetWidth)` | `'WxH'` or null. Thumbnail only when `width`/`height` are known, the original is wider than the target, and the scaled height fits the API's 1024px limit (long webtoon strips keep originals) |
-| `fetchImageUrls(images, code, { concurrency, targetWidth, onItem, signal })` | Worker pool (`concurrency` in flight, page order) calling `onItem(index, url \| null)` as each arrives; stops when `signal.cancelled` |
+| `fetchOrder(count, startAt)` | Page indices from `startAt`, wrapping around |
+| `fetchImageUrls(images, code, { concurrency, targetWidth, startAt, onItem, signal })` | Worker pool (`concurrency` in flight, `fetchOrder` from the resume page) calling `onItem(index, url \| null)` as each arrives; stops when `signal.cancelled` |
 | `classifyContents(contents)` / `isImageFile` / `naturalSort` | Split and natural-sort folders/images (jpg, jpeg, png, gif, webp, bmp) |
 
 ## Subdirectories

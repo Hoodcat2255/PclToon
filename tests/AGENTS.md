@@ -10,6 +10,7 @@ Playwright end-to-end tests that drive the production build on a mobile viewport
 | File | Description |
 |------|-------------|
 | `e2e/mock-pcloud.js` | `mockPcloud(page, { delayForFile, failFiles })` routes `api.pcloud.com` (`showpublink`, `getpublinkdownload`, `getpubthumblink`) and a fake image host serving SVGs; returns a `calls` log. `TREE` fixture: Ep 1 (known dimensions → thumbnails), Ep 2 (no dimensions), Ep 10 (natural sort) |
+| `e2e/paged.spec.js` | Paged (book) mode: toggle visibility/persistence, tap zones, swipe, keyboard, slider, mode-switch position carry-over, reload restore, end-slide episode nav, no URL refetch on switch. `settle()` waits for smooth page turns; `showChrome()` waits for the header slide-in to finish |
 | `e2e/reader.spec.js` | URL navigation, browser/header back, reload restore, progressive loading, episode swap, header auto-hide, bookmark restore, thumbnails, failed-page retry, recent resume/remove, mobile basics (viewport, input attrs, 44px targets, manifest) |
 
 ## For AI Agents
