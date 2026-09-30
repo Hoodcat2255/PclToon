@@ -151,6 +151,7 @@
 		root = { code, data };
 		loadError = '';
 		recent.add(code, data.metadata.name);
+		recent.requestPersistence();
 		await navigate({ code }, { fromParent: true });
 	}
 
@@ -260,7 +261,9 @@
 
 			{#if recent.items.length > 0}
 				<div class="w-full max-w-md mx-auto mt-8 p-4">
-					<h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">Recent</h3>
+					<h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
+						Saved links <span class="tabular-nums">({recent.items.length})</span>
+					</h3>
 					<ul class="space-y-2">
 						{#each recent.items as item (item.code)}
 							<li class="flex items-stretch gap-2">
@@ -283,7 +286,7 @@
 								<button
 									onclick={() => recent.remove(item.code)}
 									class="flex-shrink-0 w-11 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-red-500 transition-colors"
-									aria-label="Remove {item.name} from recent"
+									aria-label="Remove {item.name} from saved links"
 								>
 									<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />

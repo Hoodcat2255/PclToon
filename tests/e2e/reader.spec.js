@@ -202,8 +202,8 @@ test('recent list resumes the last episode and can remove entries', async ({ pag
 	await expect(episode(page, 'Ep 2')).toContainText('Last read');
 
 	await page.goto('./');
-	await page.getByRole('button', { name: 'Remove Test Comic from recent' }).click();
-	await expect(page.getByText('Recent')).toHaveCount(0);
+	await page.getByRole('button', { name: 'Remove Test Comic from saved links' }).click();
+	await expect(page.getByText('Saved links')).toHaveCount(0);
 });
 
 test('mobile basics: zoom allowed, url keyboard, 44px targets, manifest', async ({ page }) => {

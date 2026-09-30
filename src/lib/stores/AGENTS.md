@@ -4,14 +4,14 @@
 # stores
 
 ## Purpose
-Global client state implemented with Svelte 5 runes in `.svelte.js` modules, persisted to `localStorage`.
+Global client state implemented with Svelte 5 runes in `.svelte.js` modules, persisted to IndexedDB (saved links) and `localStorage` (preferences).
 
 ## Key Files
 | File | Description |
 |------|-------------|
 | `theme.svelte.js` | `theme` object: `value` (`'dark'` or `''`), `init()` (stored value or `prefers-color-scheme`), `toggle()` (persists `'dark'` or `'light'` to `localStorage['theme']`; a legacy `''` means follow the OS); storage access is try/catch-guarded |
 | `reading-mode.svelte.js` | `readingMode` object: `init()`, `get(code)` (`'vertical'` default \| `'paged'`), `toggle(code)`; per-series map in `localStorage['reading_modes']` |
-| `history.svelte.js` | `history` object (imported as `recent` in `+page.svelte`): `items` (max 10 `{ code, name, lastAccess, lastPath?, lastName? }`, most recent first), `init()`, `get(code)`, `add(code, name)` (dedupes, keeps last-read info), `setLast(code, path, name)` (resume point), `remove(code)`; persisted to `localStorage['recent_links']` |
+| `history.svelte.js` | Saved links, `history` object (imported as `recent` in `+page.svelte`): `items` (all `{ code, name, addedAt, lastAccess, lastPath?, lastName? }`, newest access first, no cap), `init()` (returns the load promise; migrates legacy `localStorage['recent_links']` into IndexedDB — newer `lastAccess` wins, key removed only after success), `get(code)`, async `add` / `setLast` / `remove` (each awaits `init()` so early calls are not lost), `requestPersistence()` (call from explicit user actions only; skips when already persisted). Writes go through `linksDb.update` (read-merge-write in one transaction) so another tab's `lastPath` is not clobbered. Falls back to `localStorage['recent_links']` if IndexedDB cannot open |
 
 ## For AI Agents
 
@@ -21,10 +21,12 @@ Global client state implemented with Svelte 5 runes in `.svelte.js` modules, per
 - `init()` must be called from `onMount` (`theme` in `+layout.svelte`, `history` in `+page.svelte`); guard `window` access for prerender.
 - Wrap every `localStorage` access in try/catch (blocked storage throws).
 - Calling store methods inside an `$effect` subscribes the effect to `items`; use `untrack` when only writing.
-- `localStorage` keys in use app-wide: `theme`, `recent_links`, `reading_modes`, `bookmark_{code}_{folderId}` (the last one is written by `ImageViewer`, not a store).
+- Store `$state.snapshot(...)` values in IndexedDB — reactive proxies throw `DataCloneError`.
+- Persistent data app-wide: IndexedDB `pcltoon`/`links` (saved links); `localStorage` `theme`, `reading_modes`, `bookmark_{code}_{folderId}` (`recent_links` only as legacy/fallback). Bookmarks are written by `ImageViewer`, not a store.
+- iOS Safari may clear site data (IndexedDB included) after ~7 days without use unless the app was added to the home screen (unverified; general knowledge). Recommend installing the PWA.
 
 ### Testing Requirements
-- Manual: toggle theme and reload; open several links and confirm order/limit of recent list.
+- `tests/e2e/saved-links.spec.js` covers the saved-links store; manual: toggle theme and reload.
 
 ## Dependencies
 

@@ -11,6 +11,7 @@ Code imported through the `$lib` alias: the pCloud API client, URL/navigation an
 |------|-------------|
 | `pcloud.js` | pCloud Public API client and content helpers (see below) |
 | `nav.js` | URL ⇄ view state: `parseSearch`, `buildSearch` (`?code=…&p=id/id&view=list`), `resolvePath` (walks the showpublink tree, reports stale paths), `defaultView` (list vs viewer rule) |
+| `db.js` | IndexedDB wrapper: database `pcltoon` v1, object store `links` keyed by `code`; `linksDb.all()`, `linksDb.update(code, merge)` (get → `merge(current)` → put in one readwrite transaction; resolves with the stored record), `linksDb.delete(code)`; promises resolve on commit. `onversionchange` closes the connection so newer tabs can upgrade. Bump `DB_VERSION` and extend `onupgradeneeded` for schema changes |
 | `bookmark.js` | Reading position as `{ i, f }` (page index + fraction into it): `computePosition`, `positionToScroll`, `parseBookmark`, `loadBookmark`/`saveBookmark` (`localStorage['bookmark_{code}_{folderId}']`) |
 | `*.test.js` | vitest unit tests for the three modules above |
 | `index.js` | Template placeholder; exports nothing |

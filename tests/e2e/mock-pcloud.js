@@ -25,6 +25,11 @@ export const TREE = {
 	]
 };
 
+function extraTree(code) {
+	const n = Number(code.slice('EXTRA'.length));
+	return { name: `Extra ${n}`, folderid: 9000 + n, isfolder: true, contents: images(90 + n, 2, [800, 1200]) };
+}
+
 function svg(width, height, label) {
 	return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><rect width="100%" height="100%" fill="#ddd"/><text x="20" y="80" font-size="60">${label}</text></svg>`;
 }
@@ -49,7 +54,10 @@ export async function mockPcloud(page, { delayForFile = () => 0, failFiles = [],
 
 		if (url.pathname === '/showpublink') {
 			calls.showpublink++;
-			return json(code === CODE ? { result: 0, metadata: TREE } : { result: 7001, error: 'Invalid link code.' });
+			if (code === CODE) return json({ result: 0, metadata: TREE });
+			// EXTRA<n>: additional small series for multi-link tests.
+			if (/^EXTRA\d+$/.test(code)) return json({ result: 0, metadata: extraTree(code) });
+			return json({ result: 7001, error: 'Invalid link code.' });
 		}
 
 		const delay = delayForFile(fileid);
