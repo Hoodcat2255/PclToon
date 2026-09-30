@@ -140,6 +140,9 @@ test('reading position is saved when leaving the episode in-app', async ({ page 
 	await pageImage(page, 6).scrollIntoViewIfNeeded();
 	const before = await page.evaluate(() => window.scrollY);
 
+	// Scrolling down hid the header; tap to bring it back like a reader would.
+	await page.touchscreen.tap(200, 400);
+	await expect(header(page)).not.toHaveClass(/-translate-y-full/);
 	await page.getByRole('button', { name: 'Go back' }).click();
 	await expect(episode(page, 'Ep 1')).toBeVisible();
 	await episode(page, 'Ep 1').click();
@@ -234,4 +237,38 @@ test('choosing light theme sticks even when the OS prefers dark', async ({ page 
 	await page.reload();
 	await expect(page.getByLabel('pCloud Public Link')).toBeVisible();
 	await expect(root).not.toHaveClass('dark');
+});
+
+test('fast scroller appears on scroll and dragging it jumps through the episode', async ({ page }) => {
+	await mockPcloud(page);
+	await page.goto(`./?code=${CODE}&p=${EP1}`);
+	await expect(pageImage(page, 12)).toBeAttached();
+	const scroller = page.getByTestId('fast-scroller');
+	await expect(scroller).toHaveCSS('pointer-events', 'none');
+
+	await page.evaluate(() => window.scrollBy(0, 300));
+	await expect(scroller).toHaveCSS('pointer-events', 'auto');
+
+	// Real touch events: Playwright's mouse on an emulated mobile page gets
+	// pointercancel mid-drag, which a finger on a phone does not.
+	const box = await scroller.boundingBox();
+	const x = box.x + box.width / 2;
+	let y = box.y + box.height / 2;
+	const cdp = await page.context().newCDPSession(page);
+	await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+	for (; y < page.viewportSize().height; y += 80) {
+		await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y }] });
+	}
+	await expect(scroller).toContainText(/\d+ \/ 12/);
+	await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+
+	const { scrollY, max } = await page.evaluate(() => ({
+		scrollY: window.scrollY,
+		max: document.documentElement.scrollHeight - window.innerHeight
+	}));
+	expect(scrollY).toBeGreaterThan(max - 5);
+	await expect(scroller).not.toContainText('/');
+
+	// Fades out and stops intercepting taps when idle.
+	await expect(scroller).toHaveCSS('pointer-events', 'none', { timeout: 5000 });
 });

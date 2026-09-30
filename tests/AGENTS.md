@@ -17,6 +17,8 @@ Playwright end-to-end tests that drive the production build on a mobile viewport
 ### Working In This Directory
 - The app runs under `/PclToon/`; navigate with relative URLs (`page.goto('./?code=…')`), not `/`.
 - Add fixture folders/images to `TREE` rather than ad-hoc routes so every test shares one fake API.
+- Drags on mobile-emulated pages: use CDP `Input.dispatchTouchEvent`. Playwright's `page.mouse` on an emulated mobile page gets `pointercancel` mid-drag, unlike a real finger.
+- `locator.click()` auto-scrolls first, which trips the header auto-hide; use `page.touchscreen.tap(x, y)` for in-place taps, and tap to reveal a hidden header before clicking its buttons.
 - Unit tests for pure helpers live next to the code in `src/lib/*.test.js` (vitest), not here.
 
 ### Testing Requirements

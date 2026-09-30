@@ -1,6 +1,7 @@
 <script>
 	import { onMount, tick, untrack } from 'svelte';
 	import { fetchImageUrls, getImageUrl } from '$lib/pcloud.js';
+	import FastScroller from './FastScroller.svelte';
 	import {
 		computePosition,
 		positionToScroll,
@@ -87,6 +88,11 @@
 	function updatePosition() {
 		trackPosition();
 		persistPosition();
+	}
+
+	function currentPageLabel() {
+		const position = computePosition(pageBoxes(), window.scrollY);
+		return position ? `${position.i + 1} / ${images.length}` : '';
 	}
 
 	function handleLoad(i) {
@@ -203,7 +209,7 @@
 	<!-- Tapping the page toggles the header for distraction-free reading; keyboard
 	     users get the header back by scrolling up, so no key handler is needed. -->
 	<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-	<div class="flex flex-col items-center" onclick={() => onTap?.()}>
+	<div id="episode-pages" class="flex flex-col items-center" onclick={() => onTap?.()}>
 		{#each images as image, i (image.fileid)}
 			{@const page = pages[i]}
 			<div
@@ -273,8 +279,10 @@
 		</div>
 	{/if}
 
+	<FastScroller pageLabel={currentPageLabel} onDragStart={cancelRestore} />
+
 	{#if loadedCount < images.length}
-		<div class="fixed bottom-4 right-4 bg-black/70 text-white px-3 py-2 rounded-lg text-sm pointer-events-none">
+		<div class="fixed bottom-4 left-4 bg-black/70 text-white px-3 py-2 rounded-lg text-sm pointer-events-none">
 			{loadedCount} / {images.length}
 		</div>
 	{/if}
