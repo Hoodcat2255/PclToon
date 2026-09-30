@@ -9,7 +9,7 @@ GitHub Actions CI/CD configuration. `workflows/` contains a single GitHub Pages 
 ## Key Files
 | File | Description |
 |------|-------------|
-| `workflows/deploy.yml` | On push to `main` or manual dispatch: Node 20 → `npm ci` → `NODE_ENV=production npm run build` → upload `build/` as Pages artifact → deploy with `deploy-pages@v4` |
+| `workflows/deploy.yml` | On push to `main` or manual dispatch: Node 24 (vitest 5 needs ≥ 22.12; `.npmrc` has `engine-strict=true`) → `npm ci` → `NODE_ENV=production npm run build` → upload `build/` as Pages artifact → deploy with `deploy-pages@v4` |
 
 ## For AI Agents
 
