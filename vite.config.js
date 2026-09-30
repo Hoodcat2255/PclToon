@@ -8,5 +8,8 @@ export default defineConfig({
 		watch: {
 			ignored: ['**/.claude/**', '**/.omc/**']
 		}
+	},
+	test: {
+		include: ['src/**/*.test.js']
 	}
 });
