@@ -1,38 +1,41 @@
 <script>
 	// Draggable scroll handle on the right edge for jumping through long
-	// episodes. It appears while scrolling and fades out when idle; while hidden
-	// it ignores pointer events so it never blocks taps on the pages.
-	let { pageLabel = null, onDragStart = null } = $props();
+	// episodes. It stays up while `pinned` (the header is showing), appears
+	// briefly while scrolling otherwise, and ignores pointer events while hidden
+	// so it never blocks taps on the pages.
+	let { pageLabel = null, onDragStart = null, pinned = false } = $props();
 
 	const HIDE_DELAY_MS = 2000;
 	const HANDLE_HEIGHT = 56;
 
 	let trackEl;
 	let progress = $state(0);
-	let visible = $state(false);
+	let recentlyScrolled = $state(false);
 	let dragging = $state(false);
 	let label = $state('');
 	let grabOffset = 0;
 	let hideTimer;
 
+	let visible = $derived(pinned || recentlyScrolled || dragging);
+
 	const maxScroll = () => document.documentElement.scrollHeight - window.innerHeight;
 
 	function scheduleHide() {
 		clearTimeout(hideTimer);
-		hideTimer = setTimeout(() => (visible = false), HIDE_DELAY_MS);
+		hideTimer = setTimeout(() => (recentlyScrolled = false), HIDE_DELAY_MS);
 	}
 
 	function handleScroll() {
 		const max = maxScroll();
 		if (max <= 0) return;
 		progress = Math.min(Math.max(window.scrollY / max, 0), 1);
-		visible = true;
+		recentlyScrolled = true;
 		if (!dragging) scheduleHide();
 	}
 
 	function handlePointerDown(e) {
 		dragging = true;
-		visible = true;
+		recentlyScrolled = true;
 		clearTimeout(hideTimer);
 		grabOffset = e.clientY - e.currentTarget.getBoundingClientRect().top;
 		e.currentTarget.setPointerCapture(e.pointerId);

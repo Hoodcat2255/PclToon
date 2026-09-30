@@ -17,6 +17,7 @@
 		onNextEpisode = null,
 		hasPrevEpisode = false,
 		hasNextEpisode = false,
+		chromeVisible = true,
 		onTap = null
 	} = $props();
 
@@ -27,7 +28,6 @@
 	// fixed for the lifetime of an instance.
 	// status: 'pending' (resolving URL) | 'ready' (URL set) | 'loaded' | 'error'
 	let pages = $state(untrack(() => images).map(() => ({ url: null, status: 'pending', retried: false })));
-	let loadedCount = $derived(pages.filter((page) => page.status === 'loaded').length);
 
 	/** @type {HTMLElement[]} */
 	const pageEls = [];
@@ -279,11 +279,5 @@
 		</div>
 	{/if}
 
-	<FastScroller pageLabel={currentPageLabel} onDragStart={cancelRestore} />
-
-	{#if loadedCount < images.length}
-		<div class="fixed bottom-4 left-4 bg-black/70 text-white px-3 py-2 rounded-lg text-sm pointer-events-none">
-			{loadedCount} / {images.length}
-		</div>
-	{/if}
+	<FastScroller pageLabel={currentPageLabel} onDragStart={cancelRestore} pinned={chromeVisible} />
 </div>

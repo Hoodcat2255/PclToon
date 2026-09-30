@@ -239,18 +239,34 @@ test('choosing light theme sticks even when the OS prefers dark', async ({ page 
 	await expect(root).not.toHaveClass('dark');
 });
 
-test('fast scroller appears on scroll and dragging it jumps through the episode', async ({ page }) => {
+test('fast scroller follows the header and dragging it jumps through the episode', async ({ page }) => {
 	await mockPcloud(page);
 	await page.goto(`./?code=${CODE}&p=${EP1}`);
 	await expect(pageImage(page, 12)).toBeAttached();
 	const scroller = page.getByTestId('fast-scroller');
-	await expect(scroller).toHaveCSS('pointer-events', 'none');
+	const hiddenHeader = /-translate-y-full/;
 
-	await page.evaluate(() => window.scrollBy(0, 300));
+	// Shown together with the header on open.
+	await expect(header(page)).not.toHaveClass(hiddenHeader);
 	await expect(scroller).toHaveCSS('pointer-events', 'auto');
 
-	// Real touch events: Playwright's mouse on an emulated mobile page gets
-	// pointercancel mid-drag, which a finger on a phone does not.
+	// Scrolling down hides the header; the handle fades once scrolling stops.
+	await page.mouse.wheel(0, 600);
+	await expect(header(page)).toHaveClass(hiddenHeader);
+	await expect(scroller).toHaveCSS('pointer-events', 'none', { timeout: 5000 });
+
+	// A tap brings both back, another tap hides both.
+	await page.touchscreen.tap(200, 400);
+	await expect(header(page)).not.toHaveClass(hiddenHeader);
+	await expect(scroller).toHaveCSS('pointer-events', 'auto');
+	await page.touchscreen.tap(200, 400);
+	await expect(header(page)).toHaveClass(hiddenHeader);
+	await expect(scroller).toHaveCSS('pointer-events', 'none');
+
+	// Drag with real touch events: Playwright's mouse on an emulated mobile page
+	// gets pointercancel mid-drag, which a finger on a phone does not.
+	await page.touchscreen.tap(200, 400);
+	await expect(scroller).toHaveCSS('pointer-events', 'auto');
 	const box = await scroller.boundingBox();
 	const x = box.x + box.width / 2;
 	let y = box.y + box.height / 2;
@@ -268,7 +284,11 @@ test('fast scroller appears on scroll and dragging it jumps through the episode'
 	}));
 	expect(scrollY).toBeGreaterThan(max - 5);
 	await expect(scroller).not.toContainText('/');
+});
 
-	// Fades out and stops intercepting taps when idle.
-	await expect(scroller).toHaveCSS('pointer-events', 'none', { timeout: 5000 });
+test('no loading counter badge is shown', async ({ page }) => {
+	await mockPcloud(page, { delayForFile: () => 1500 });
+	await page.goto(`./?code=${CODE}&p=${EP1}`);
+	await expect(page.getByText('Page 1', { exact: true })).toBeVisible();
+	await expect(page.getByText(/^\d+ \/ 12$/)).toHaveCount(0);
 });

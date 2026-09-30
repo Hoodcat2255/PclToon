@@ -281,6 +281,7 @@
 				onNextEpisode={() => handleEpisodeNav(1)}
 				{hasPrevEpisode}
 				{hasNextEpisode}
+				chromeVisible={!headerHidden}
 				onTap={() => (headerHidden = !headerHidden)}
 			/>
 		{/key}
