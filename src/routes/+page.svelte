@@ -7,6 +7,7 @@
 	import LinkInput from '$lib/components/LinkInput.svelte';
 	import EpisodeList from '$lib/components/EpisodeList.svelte';
 	import ImageViewer from '$lib/components/ImageViewer.svelte';
+	import ReaderBar from '$lib/components/ReaderBar.svelte';
 	import { extractCode, fetchPublicLink, classifyContents } from '$lib/pcloud.js';
 	import { parseSearch, buildSearch, resolvePath, defaultView } from '$lib/nav.js';
 	import { history as recent } from '$lib/stores/history.svelte.js';
@@ -14,6 +15,9 @@
 
 	const HEADER_HIDE_OFFSET = 80;
 	const SCROLL_DELTA = 8;
+	// Distance from the end of an episode at which the bars come back, so the
+	// next-episode controls are at hand when the reader finishes.
+	const END_REVEAL_OFFSET = 24;
 
 	// Last fetched showpublink response: { code, data }. Read-only, so no deep proxy.
 	let root = $state.raw(null);
@@ -21,6 +25,10 @@
 	let openRequest = 0;
 	let loadError = $state('');
 	let headerHidden = $state(false);
+	let readerBarHeight = $state(0);
+	// While the fast-scroll handle is dragged, the scrolling it causes must not
+	// hide the bars (and with them the handle).
+	let scrubbing = false;
 
 	let route = $derived(parseSearch(page.url.searchParams));
 	let resolved = $derived(
@@ -46,6 +54,7 @@
 	);
 	let hasPrevEpisode = $derived(episodeIndex > 0);
 	let hasNextEpisode = $derived(episodeIndex >= 0 && episodeIndex < siblingFolders.length - 1);
+	let showReaderBar = $derived(currentView === 'viewer' && episodeIndex >= 0);
 
 	// Child of the current folder on the last-read path, highlighted in the list.
 	let lastReadId = $derived.by(() => {
@@ -122,13 +131,19 @@
 		let lastY = window.scrollY;
 		function onScroll() {
 			const y = window.scrollY;
+			if (scrubbing) {
+				lastY = y;
+				return;
+			}
 			// Jumps of more than a screen are programmatic (bookmark restore, mode
 			// switch), not the reader scrolling; leave the header as it is.
 			if (Math.abs(y - lastY) > window.innerHeight) {
 				lastY = y;
 				return;
 			}
-			if (y > lastY + SCROLL_DELTA && y > HEADER_HIDE_OFFSET) headerHidden = true;
+			const atEnd = y >= document.documentElement.scrollHeight - window.innerHeight - END_REVEAL_OFFSET;
+			if (atEnd && y > lastY) headerHidden = false;
+			else if (y > lastY + SCROLL_DELTA && y > HEADER_HIDE_OFFSET) headerHidden = true;
 			else if (y < lastY - SCROLL_DELTA) headerHidden = false;
 			if (Math.abs(y - lastY) > SCROLL_DELTA) lastY = y;
 		}
@@ -182,15 +197,29 @@
 		navigate(target, { replace: true });
 	}
 
+	function handleScrub(active) {
+		if (active) {
+			scrubbing = true;
+			return;
+		}
+		// Scroll events for the last drag step arrive on the next frame; let them
+		// pass before the bars react to scrolling again.
+		requestAnimationFrame(() => requestAnimationFrame(() => (scrubbing = false)));
+	}
+
+	function openEpisode(folder) {
+		if (!folder || folder.folderid === node?.folderid) return;
+		navigate({ code: route.code, path: [...route.path.slice(0, -1), folder.folderid] }, { replace: true });
+	}
+
 	function handleEpisodeNav(direction) {
-		const next = siblingFolders[episodeIndex + direction];
-		if (episodeIndex < 0 || !next) return;
-		navigate({ code: route.code, path: [...route.path.slice(0, -1), next.folderid] }, { replace: true });
+		if (episodeIndex < 0) return;
+		openEpisode(siblingFolders[episodeIndex + direction]);
 	}
 
 	function handleKeydown(e) {
 		if (currentView === 'input') return;
-		if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+		if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
 
 		switch (e.key) {
 			case 'Escape':
@@ -217,7 +246,10 @@
 
 <svelte:window onkeydown={handleKeydown} />
 
-<div class="min-h-dvh bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+<div
+	class="min-h-dvh bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+	style:--reader-bar-h="{showReaderBar ? readerBarHeight : 0}px"
+>
 	<Header
 		title={currentTitle}
 		showBack={currentView !== 'input'}
@@ -321,7 +353,17 @@
 				{mode}
 				onTap={() => (headerHidden = !headerHidden)}
 				onPageTurn={() => (headerHidden = true)}
+				onScrub={handleScrub}
 			/>
 		{/key}
+		{#if showReaderBar}
+			<ReaderBar
+				episodes={siblingFolders}
+				index={episodeIndex}
+				hidden={headerHidden}
+				onSelect={openEpisode}
+				bind:barHeight={readerBarHeight}
+			/>
+		{/if}
 	{/if}
 </div>

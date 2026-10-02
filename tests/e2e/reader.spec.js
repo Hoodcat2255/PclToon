@@ -84,7 +84,7 @@ test('next episode swaps in the new images and replaces the history entry', asyn
 	await episode(page, 'Ep 1').click();
 	await expect(pageImage(page, 1)).toBeVisible();
 
-	await page.getByRole('button', { name: 'Next' }).click();
+	await page.getByRole('button', { name: 'Next', exact: true }).click();
 	await expect(page).toHaveURL(new RegExp(`p=${EP2}$`));
 	await expect(header(page)).toContainText('Ep 2');
 	await expect(page.locator(`img[src$="/${EP2 * 100 + 1}.svg"]`)).toBeVisible();
@@ -253,10 +253,15 @@ test('fast scroller follows the header and dragging it jumps through the episode
 	await expect(header(page)).not.toHaveClass(hiddenHeader);
 	await expect(scroller).toHaveCSS('pointer-events', 'auto');
 
-	// Scrolling down hides the header; the handle fades once scrolling stops.
+	// Scrolling down hides the header and the handle with it; further reading
+	// scrolls never bring the handle back on their own.
 	await page.mouse.wheel(0, 600);
 	await expect(header(page)).toHaveClass(hiddenHeader);
-	await expect(scroller).toHaveCSS('pointer-events', 'none', { timeout: 5000 });
+	await expect(scroller).toHaveCSS('pointer-events', 'none');
+	await page.mouse.wheel(0, 300);
+	await expect(header(page)).toHaveClass(hiddenHeader);
+	await expect(scroller.locator('..')).toHaveCSS('opacity', '0');
+	await expect(scroller).toHaveCSS('pointer-events', 'none');
 
 	// A tap brings both back, another tap hides both.
 	await page.touchscreen.tap(200, 400);
@@ -280,6 +285,9 @@ test('fast scroller follows the header and dragging it jumps through the episode
 	}
 	await expect(scroller).toContainText(/\d+ \/ 12/);
 	await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+	// The drag's own scrolling does not hide the chrome, so the handle stays.
+	await expect(header(page)).not.toHaveClass(hiddenHeader);
+	await expect(scroller).toHaveCSS('pointer-events', 'auto');
 
 	const { scrollY, max } = await page.evaluate(() => ({
 		scrollY: window.scrollY,
@@ -294,4 +302,92 @@ test('no loading counter badge is shown', async ({ page }) => {
 	await page.goto(`./?code=${CODE}&p=${EP1}`);
 	await expect(page.getByText('Page 1', { exact: true })).toBeVisible();
 	await expect(page.getByText(/^\d+ \/ 12$/)).toHaveCount(0);
+});
+
+const readerBar = (page) => page.getByRole('navigation', { name: 'Episode navigation' });
+
+test('bottom bar steps between episodes and the picker jumps to any episode', async ({ page }) => {
+	await mockPcloud(page);
+	await openLink(page);
+	await episode(page, 'Ep 1').click();
+	await expect(pageImage(page, 1)).toBeVisible();
+
+	const bar = readerBar(page);
+	const picker = bar.getByRole('combobox', { name: 'Episode' });
+	await expect(bar).toBeInViewport();
+	await expect(bar.getByRole('button', { name: 'Previous episode' })).toBeDisabled();
+	await expect(picker.locator('option')).toHaveText(['Ep 1 (1/3)', 'Ep 2 (2/3)', 'Ep 10 (3/3)']);
+	await expect(picker).toHaveValue(String(EP1));
+	for (const target of [bar.getByRole('button', { name: 'Previous episode' }), picker]) {
+		const box = await target.boundingBox();
+		expect(box.height).toBeGreaterThanOrEqual(44);
+	}
+
+	await bar.getByRole('button', { name: 'Next episode' }).click();
+	await expect(page).toHaveURL(new RegExp(`p=${EP2}$`));
+	await expect(header(page)).toContainText('Ep 2');
+	await expect(picker).toHaveValue(String(EP2));
+
+	await picker.selectOption({ label: 'Ep 10 (3/3)' });
+	await expect(page).toHaveURL(new RegExp(`p=12$`));
+	await expect(header(page)).toContainText('Ep 10');
+	await expect(bar.getByRole('button', { name: 'Next episode' })).toBeDisabled();
+
+	// Keys pressed in the picker do not leave the viewer.
+	await picker.focus();
+	await page.keyboard.press('Backspace');
+	await expect(page).toHaveURL(new RegExp(`p=12$`));
+
+	// Episode jumps replace the entry: back returns to the list.
+	await page.goBack();
+	await expect(page).toHaveURL(new RegExp(`\\?code=${CODE}$`));
+});
+
+test('bottom bar hides and shows with the header and comes back at the end', async ({ page }) => {
+	await mockPcloud(page);
+	await page.goto(`./?code=${CODE}&p=${EP1}`);
+	await expect(pageImage(page, 3)).toBeAttached();
+	const bar = readerBar(page);
+	const hiddenBar = /(^|\s)translate-y-full/;
+
+	await expect(bar).not.toHaveClass(hiddenBar);
+	await page.mouse.wheel(0, 600);
+	await expect(header(page)).toHaveClass(/-translate-y-full/);
+	await expect(bar).toHaveClass(hiddenBar);
+	await expect(bar).toHaveAttribute('inert');
+
+	await page.touchscreen.tap(200, 400);
+	await expect(bar).not.toHaveClass(hiddenBar);
+	await expect(bar).not.toHaveAttribute('inert');
+	await page.touchscreen.tap(200, 400);
+	await expect(bar).toHaveClass(hiddenBar);
+
+	// Reading to the end brings the bars back for the next episode.
+	for (let i = 0; i < 12; i++) await page.mouse.wheel(0, 400);
+	await expect
+		.poll(() => page.evaluate(() => window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2))
+		.toBe(true);
+	await expect(bar).not.toHaveClass(hiddenBar);
+	await expect(header(page)).not.toHaveClass(/-translate-y-full/);
+	// The end-of-episode buttons stay above the bar.
+	const nav = await page.getByRole('button', { name: 'Next', exact: true }).boundingBox();
+	const barBox = await bar.boundingBox();
+	expect(nav.y + nav.height).toBeLessThanOrEqual(barBox.y);
+});
+
+test('paged mode keeps the slider above the bottom bar', async ({ page }) => {
+	await mockPcloud(page);
+	await page.goto(`./?code=${CODE}&p=${EP1}`);
+	await page.getByRole('button', { name: 'Switch to page mode' }).click();
+	await expect(page.getByTestId('page-flipper')).toBeVisible();
+	const slider = await page.getByRole('slider', { name: 'Page' }).boundingBox();
+	const bar = await readerBar(page).boundingBox();
+	expect(slider.y + slider.height).toBeLessThanOrEqual(bar.y);
+
+	// Arrow keys in the picker change the selection, not the page.
+	await readerBar(page).getByRole('combobox', { name: 'Episode' }).focus();
+	await page.keyboard.press('ArrowRight');
+	await expect
+		.poll(() => page.getByTestId('page-flipper').evaluate((el) => Math.round(el.scrollLeft / el.clientWidth)))
+		.toBe(0);
 });

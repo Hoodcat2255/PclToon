@@ -23,7 +23,8 @@
 		chromeVisible = true,
 		mode = 'vertical',
 		onTap = null,
-		onPageTurn = null
+		onPageTurn = null,
+		onScrub = null
 	} = $props();
 
 	const RESTORE_TIMEOUT_MS = 15000;
@@ -272,7 +273,8 @@
 		onRetry={retryPage}
 	/>
 {:else}
-	<div class="min-h-dvh bg-black">
+	<!-- Bottom padding keeps the end-of-episode controls clear of the reader bar. -->
+	<div class="min-h-dvh bg-black pb-(--reader-bar-h)">
 		<!-- Tapping the page toggles the header for distraction-free reading; keyboard
 		     users get the header back by scrolling up, so no key handler is needed. -->
 		<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
@@ -307,6 +309,14 @@
 			<EpisodeNav hasPrev={hasPrevEpisode} hasNext={hasNextEpisode} onPrev={onPrevEpisode} onNext={onNextEpisode} />
 		{/if}
 
-		<FastScroller pageLabel={currentPageLabel} onDragStart={cancelRestore} pinned={chromeVisible} />
+		<FastScroller
+			pageLabel={currentPageLabel}
+			onDragStart={() => {
+				cancelRestore();
+				onScrub?.(true);
+			}}
+			onDragEnd={() => onScrub?.(false)}
+			visible={chromeVisible}
+		/>
 	</div>
 {/if}

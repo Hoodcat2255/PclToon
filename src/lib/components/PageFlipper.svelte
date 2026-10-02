@@ -64,7 +64,7 @@
 	}
 
 	function handleKeydown(e) {
-		if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+		if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
 		const moves = {
 			ArrowRight: base() + 1,
 			PageDown: base() + 1,
@@ -133,7 +133,7 @@
 </div>
 
 {#if chromeVisible && images.length > 0}
-	<div class="fixed bottom-0 inset-x-0 z-40 flex items-center gap-3 px-4 py-2 bg-black/80 text-white">
+	<div class="fixed bottom-(--reader-bar-h) inset-x-0 z-40 flex items-center gap-3 px-4 py-2 bg-black/80 text-white">
 		<input
 			type="range"
 			aria-label="Page"

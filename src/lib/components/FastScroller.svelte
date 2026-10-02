@@ -1,42 +1,31 @@
 <script>
 	// Draggable scroll handle on the right edge for jumping through long
-	// episodes. It stays up while `pinned` (the header is showing), appears
-	// briefly while scrolling otherwise, and ignores pointer events while hidden
-	// so it never blocks taps on the pages.
-	let { pageLabel = null, onDragStart = null, pinned = false } = $props();
+	// episodes. Like the header and bottom bar it shows only while the reader
+	// chrome is up (`visible`) or while being dragged, never during ordinary
+	// scrolling, and ignores pointer events while hidden so it never blocks taps
+	// on the pages.
+	let { pageLabel = null, onDragStart = null, onDragEnd = null, visible = false } = $props();
 
-	const HIDE_DELAY_MS = 2000;
 	const HANDLE_HEIGHT = 56;
 
 	let trackEl;
 	let progress = $state(0);
-	let recentlyScrolled = $state(false);
 	let dragging = $state(false);
 	let label = $state('');
 	let grabOffset = 0;
-	let hideTimer;
 
-	let visible = $derived(pinned || recentlyScrolled || dragging);
+	let shown = $derived(visible || dragging);
 
 	const maxScroll = () => document.documentElement.scrollHeight - window.innerHeight;
-
-	function scheduleHide() {
-		clearTimeout(hideTimer);
-		hideTimer = setTimeout(() => (recentlyScrolled = false), HIDE_DELAY_MS);
-	}
 
 	function handleScroll() {
 		const max = maxScroll();
 		if (max <= 0) return;
 		progress = Math.min(Math.max(window.scrollY / max, 0), 1);
-		recentlyScrolled = true;
-		if (!dragging) scheduleHide();
 	}
 
 	function handlePointerDown(e) {
 		dragging = true;
-		recentlyScrolled = true;
-		clearTimeout(hideTimer);
 		grabOffset = e.clientY - e.currentTarget.getBoundingClientRect().top;
 		e.currentTarget.setPointerCapture(e.pointerId);
 		label = pageLabel?.() ?? '';
@@ -56,17 +45,15 @@
 	function handlePointerUp() {
 		if (!dragging) return;
 		dragging = false;
-		scheduleHide();
+		onDragEnd?.();
 	}
-
-	$effect(() => () => clearTimeout(hideTimer));
 </script>
 
 <svelte:window onscroll={handleScroll} />
 
 <div
 	bind:this={trackEl}
-	class="fixed right-0 top-16 bottom-4 w-11 z-40 pointer-events-none transition-opacity duration-300 {visible ? 'opacity-100' : 'opacity-0'}"
+	class="fixed right-0 top-16 bottom-[calc(var(--reader-bar-h,0px)+1rem)] w-11 z-40 pointer-events-none transition-opacity duration-200 {shown ? 'opacity-100' : 'opacity-0'}"
 >
 	<div
 		role="scrollbar"
@@ -76,7 +63,7 @@
 		aria-valuenow={Math.round(progress * 100)}
 		tabindex="-1"
 		data-testid="fast-scroller"
-		class="absolute right-0 w-11 flex items-center justify-center touch-none select-none {visible ? 'pointer-events-auto' : ''}"
+		class="absolute right-0 w-11 flex items-center justify-center touch-none select-none {shown ? 'pointer-events-auto' : ''}"
 		style="top: calc({progress} * (100% - {HANDLE_HEIGHT}px)); height: {HANDLE_HEIGHT}px"
 		onpointerdown={handlePointerDown}
 		onpointermove={handlePointerMove}
