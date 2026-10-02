@@ -13,7 +13,7 @@
 	let hasNext = $derived(index >= 0 && index < episodes.length - 1);
 
 	const buttonClass =
-		'flex-shrink-0 flex items-center gap-1 h-11 px-3 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:pointer-events-none';
+		'flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:pointer-events-none';
 </script>
 
 <nav
@@ -33,7 +33,6 @@
 			<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
 			</svg>
-			<span class="text-sm">Prev</span>
 		</button>
 		<select
 			aria-label="Episode"
@@ -55,7 +54,6 @@
 			class={buttonClass}
 			aria-label="Next episode"
 		>
-			<span class="text-sm">Next</span>
 			<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
 			</svg>

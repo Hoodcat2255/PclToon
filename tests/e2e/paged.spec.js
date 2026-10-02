@@ -183,15 +183,23 @@ test('paged position is restored after reload', async ({ page }) => {
 	await expectPage(page, 5);
 });
 
-test('the end slide offers episode navigation', async ({ page }) => {
+test('the last page brings the bars back instead of an end slide', async ({ page }) => {
 	await mockPcloud(page);
 	await openPaged(page);
+	await page.keyboard.press('ArrowRight');
+	await expect(header(page)).toHaveClass(hiddenHeader);
 	await page.keyboard.press('End');
 	await expectPage(page, 12);
-	await page.keyboard.press('ArrowRight');
-	await expect(page.getByText('End of episode')).toBeInViewport();
+	await expect(header(page)).not.toHaveClass(hiddenHeader);
 
-	await flipper(page).getByRole('button', { name: 'Next' }).click();
+	// Nothing lies past the last page.
+	await page.keyboard.press('ArrowRight');
+	await settle(page);
+	await expectPage(page, 12);
+	await expect(flipper(page).getByRole('button')).toHaveCount(0);
+
+	await expect.poll(async () => (await header(page).boundingBox()).y).toBe(0);
+	await page.getByRole('button', { name: 'Next episode' }).click();
 	await expect(page).toHaveURL(new RegExp(`p=${EP2}$`));
 	await expect(flipper(page)).toBeVisible();
 	await expectPage(page, 1);

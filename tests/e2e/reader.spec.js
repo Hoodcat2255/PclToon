@@ -84,7 +84,7 @@ test('next episode swaps in the new images and replaces the history entry', asyn
 	await episode(page, 'Ep 1').click();
 	await expect(pageImage(page, 1)).toBeVisible();
 
-	await page.getByRole('button', { name: 'Next', exact: true }).click();
+	await page.getByRole('button', { name: 'Next episode' }).click();
 	await expect(page).toHaveURL(new RegExp(`p=${EP2}$`));
 	await expect(header(page)).toContainText('Ep 2');
 	await expect(page.locator(`img[src$="/${EP2 * 100 + 1}.svg"]`)).toBeVisible();
@@ -369,10 +369,11 @@ test('bottom bar hides and shows with the header and comes back at the end', asy
 		.toBe(true);
 	await expect(bar).not.toHaveClass(hiddenBar);
 	await expect(header(page)).not.toHaveClass(/-translate-y-full/);
-	// The end-of-episode buttons stay above the bar.
-	const nav = await page.getByRole('button', { name: 'Next', exact: true }).boundingBox();
+	// The bar is the only episode navigation, and the last page stays above it.
+	await expect(page.getByRole('button', { name: 'Next', exact: true })).toHaveCount(0);
+	const last = await pageImage(page, 12).boundingBox();
 	const barBox = await bar.boundingBox();
-	expect(nav.y + nav.height).toBeLessThanOrEqual(barBox.y);
+	expect(last.y + last.height).toBeLessThanOrEqual(barBox.y + 1);
 });
 
 test('paged mode keeps the slider above the bottom bar', async ({ page }) => {

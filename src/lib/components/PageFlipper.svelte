@@ -1,6 +1,5 @@
 <script>
 	import { onMount } from 'svelte';
-	import EpisodeNav from './EpisodeNav.svelte';
 	import PageStatus from './PageStatus.svelte';
 
 	// Book-style reader: one page per screen in a horizontal scroll-snap strip,
@@ -11,12 +10,9 @@
 		pages = [],
 		startIndex = 0,
 		chromeVisible = true,
-		hasPrevEpisode = false,
-		hasNextEpisode = false,
-		onPrevEpisode = null,
-		onNextEpisode = null,
 		onIndexChange = null,
 		onPageTurn = null,
+		onReachEnd = null,
 		onTap = null,
 		onImageLoad = null,
 		onImageError = null,
@@ -34,13 +30,10 @@
 	// (touchmove) or scrollend drops it; taps keep it so rapid taps queue up.
 	let pending = null;
 
-	let hasEndSlide = $derived(hasPrevEpisode || hasNextEpisode);
-	let slideCount = $derived(images.length + (hasEndSlide ? 1 : 0));
-
 	const base = () => pending?.target ?? index;
 
 	function goTo(target, { behavior = 'smooth', quiet = false } = {}) {
-		const clamped = Math.min(Math.max(target, 0), slideCount - 1);
+		const clamped = Math.min(Math.max(target, 0), images.length - 1);
 		pending = { target: clamped, quiet };
 		scroller.scrollTo({ left: clamped * scroller.clientWidth, behavior });
 	}
@@ -51,8 +44,10 @@
 		if (next === pending?.target) pending = null;
 		if (next === index) return;
 		index = next;
-		onIndexChange?.(Math.min(next, images.length - 1));
-		if (!quiet) onPageTurn?.();
+		onIndexChange?.(next);
+		// Arriving on the last page brings the bars back for the next episode.
+		if (next === images.length - 1) onReachEnd?.();
+		else if (!quiet) onPageTurn?.();
 	}
 
 	function handleClick(e) {
@@ -124,12 +119,6 @@
 			<PageStatus index={i} status={page.status} onRetry={() => onRetry?.(i)} />
 		</div>
 	{/each}
-	{#if hasEndSlide}
-		<div data-end class="w-full h-full flex-none snap-center snap-always flex flex-col items-center justify-center text-gray-300">
-			<p>End of episode</p>
-			<EpisodeNav hasPrev={hasPrevEpisode} hasNext={hasNextEpisode} onPrev={onPrevEpisode} onNext={onNextEpisode} />
-		</div>
-	{/if}
 </div>
 
 {#if chromeVisible && images.length > 0}
@@ -139,10 +128,10 @@
 			aria-label="Page"
 			min="1"
 			max={images.length}
-			value={Math.min(index, images.length - 1) + 1}
+			value={index + 1}
 			oninput={handleSlider}
 			class="flex-1 h-11 accent-blue-500"
 		/>
-		<span class="w-16 text-right text-sm tabular-nums">{Math.min(index + 1, images.length)} / {images.length}</span>
+		<span class="w-16 text-right text-sm tabular-nums">{index + 1} / {images.length}</span>
 	</div>
 {/if}

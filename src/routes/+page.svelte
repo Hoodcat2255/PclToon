@@ -52,8 +52,6 @@
 	let episodeIndex = $derived(
 		node && parentNode ? siblingFolders.findIndex(f => f.folderid === node.folderid) : -1
 	);
-	let hasPrevEpisode = $derived(episodeIndex > 0);
-	let hasNextEpisode = $derived(episodeIndex >= 0 && episodeIndex < siblingFolders.length - 1);
 	let showReaderBar = $derived(currentView === 'viewer' && episodeIndex >= 0);
 
 	// Child of the current folder on the last-read path, highlighted in the list.
@@ -212,11 +210,6 @@
 		navigate({ code: route.code, path: [...route.path.slice(0, -1), folder.folderid] }, { replace: true });
 	}
 
-	function handleEpisodeNav(direction) {
-		if (episodeIndex < 0) return;
-		openEpisode(siblingFolders[episodeIndex + direction]);
-	}
-
 	function handleKeydown(e) {
 		if (currentView === 'input') return;
 		if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
@@ -345,15 +338,12 @@
 				images={content.images}
 				code={route.code}
 				folderId={node.folderid}
-				onPrevEpisode={() => handleEpisodeNav(-1)}
-				onNextEpisode={() => handleEpisodeNav(1)}
-				{hasPrevEpisode}
-				{hasNextEpisode}
 				chromeVisible={!headerHidden}
 				{mode}
 				onTap={() => (headerHidden = !headerHidden)}
 				onPageTurn={() => (headerHidden = true)}
 				onScrub={handleScrub}
+				onReachEnd={() => (headerHidden = false)}
 			/>
 		{/key}
 		{#if showReaderBar}

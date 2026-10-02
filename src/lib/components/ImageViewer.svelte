@@ -3,7 +3,6 @@
 	import { fetchImageUrls, getImageUrl } from '$lib/pcloud.js';
 	import FastScroller from './FastScroller.svelte';
 	import PageFlipper from './PageFlipper.svelte';
-	import EpisodeNav from './EpisodeNav.svelte';
 	import PageStatus from './PageStatus.svelte';
 	import {
 		computePosition,
@@ -16,15 +15,12 @@
 		images = [],
 		code,
 		folderId,
-		onPrevEpisode = null,
-		onNextEpisode = null,
-		hasPrevEpisode = false,
-		hasNextEpisode = false,
 		chromeVisible = true,
 		mode = 'vertical',
 		onTap = null,
 		onPageTurn = null,
-		onScrub = null
+		onScrub = null,
+		onReachEnd = null
 	} = $props();
 
 	const RESTORE_TIMEOUT_MS = 15000;
@@ -261,19 +257,16 @@
 		{pages}
 		startIndex={pagedStart}
 		{chromeVisible}
-		{hasPrevEpisode}
-		{hasNextEpisode}
-		{onPrevEpisode}
-		{onNextEpisode}
 		onIndexChange={handlePagedIndex}
 		{onPageTurn}
+		{onReachEnd}
 		{onTap}
 		onImageLoad={handleLoad}
 		onImageError={handleError}
 		onRetry={retryPage}
 	/>
 {:else}
-	<!-- Bottom padding keeps the end-of-episode controls clear of the reader bar. -->
+	<!-- Bottom padding keeps the last page clear of the reader bar. -->
 	<div class="min-h-dvh bg-black pb-(--reader-bar-h)">
 		<!-- Tapping the page toggles the header for distraction-free reading; keyboard
 		     users get the header back by scrolling up, so no key handler is needed. -->
@@ -304,10 +297,6 @@
 				</div>
 			{/each}
 		</div>
-
-		{#if hasPrevEpisode || hasNextEpisode}
-			<EpisodeNav hasPrev={hasPrevEpisode} hasNext={hasNextEpisode} onPrev={onPrevEpisode} onNext={onNextEpisode} />
-		{/if}
 
 		<FastScroller
 			pageLabel={currentPageLabel}
