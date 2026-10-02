@@ -20,7 +20,7 @@
 	aria-label="Episode navigation"
 	bind:clientHeight={barHeight}
 	inert={hidden}
-	class="fixed bottom-0 inset-x-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-t border-gray-200 dark:border-gray-700 pb-[env(safe-area-inset-bottom)] transition-transform duration-200 {hidden ? 'translate-y-full' : ''}"
+	class="fixed bottom-0 inset-x-0 z-50 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-t border-gray-200 dark:border-gray-700 transition-transform duration-200 {hidden ? 'translate-y-full' : ''}"
 >
 	<div class="flex items-center gap-2 max-w-3xl mx-auto px-2 py-1">
 		<button
