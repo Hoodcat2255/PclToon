@@ -8,7 +8,7 @@ PclToon is a comic/webtoon reader for image folders shared via pCloud public lin
 ## Key Files
 | File | Description |
 |------|-------------|
-| `package.json` | npm scripts (`dev`/`build`/`preview`/`test`/`test:e2e`) and devDependencies. No runtime dependencies |
+| `package.json` | npm scripts (`dev`/`build`/`preview`/`test`/`test:e2e`/`icons`) and devDependencies. No runtime dependencies |
 | `svelte.config.js` | `adapter-static` config (`build/` output, `index.html` fallback, `strict: true`); sets `paths.base = '/PclToon'` when `NODE_ENV=production` |
 | `vite.config.js` | `tailwindcss()` + `sveltekit()` plugins; dev server ignores `.claude/**`/`.omc/**`; vitest `test.include` (`src/**/*.test.js`) |
 | `playwright.config.js` | E2E config: Pixel 7 viewport, builds with `NODE_ENV=production` and serves `vite preview` at `http://localhost:4173/PclToon/` |
@@ -22,7 +22,8 @@ PclToon is a comic/webtoon reader for image folders shared via pCloud public lin
 |-----------|---------|
 | `src/` | Application source (see `src/AGENTS.md`) |
 | `docs/` | Reverse-engineered design docs 05–10, in Korean (see `docs/AGENTS.md`) |
-| `static/` | Copied verbatim to the site root: `manifest.webmanifest`, `favicon.svg`, `icon-192/512.png`, `apple-touch-icon.png`, `robots.txt`. Do not put docs (incl. AGENTS.md) here — they would be deployed |
+| `static/` | Copied verbatim to the site root: `manifest.webmanifest`, `icon.svg` (icon source artwork, full-bleed), generated `favicon.svg` / `icon-192.png` / `icon-512.png` (rounded, transparent corners) / `icon-maskable-512.png` / `apple-touch-icon.png` (180, opaque), `robots.txt`. Do not put docs (incl. AGENTS.md) here — they would be deployed |
+| `scripts/` | `generate-icons.js` (`npm run icons`): renders `static/icon.svg` into the PNG icons and `favicon.svg` with Playwright's Chromium. Edit `icon.svg`, keep its shapes inside the central 80% circle (maskable safe zone), then rerun |
 | `tests/` | Playwright E2E tests with a mocked pCloud API (see `tests/AGENTS.md`) |
 | `.github/` | GitHub Pages deploy workflow (see `.github/AGENTS.md`) |
 
@@ -40,6 +41,7 @@ Generated/tooling directories (not documented, git-ignored): `node_modules/`, `.
 ### Testing Requirements
 - `npm test` — vitest unit tests for pure helpers (`src/lib/*.test.js`).
 - `npm run test:e2e` — Playwright mobile E2E against the production build with pCloud mocked (first run may need `npx playwright install chromium`).
+- PWA: installable (manifest + `src/service-worker.js` app-shell cache); `InstallPrompt` offers install on the link-input view. A new deploy's worker activates immediately (`skipWaiting`) and serves the new shell from the next launch/reload; pages already open keep their loaded code.
 - `npm run build` must succeed (`strict: true` fails the build on prerender errors).
 - The mock cannot prove real pCloud behaviour (CORS, thumbnail response shape); spot-check with a real public link via `npm run dev`.
 

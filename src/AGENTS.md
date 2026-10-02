@@ -1,5 +1,5 @@
 <!-- Parent: ../AGENTS.md -->
-<!-- Generated: 2026-09-30 | Updated: 2026-09-30 -->
+<!-- Generated: 2026-09-30 | Updated: 2026-10-03 -->
 
 # src
 
@@ -9,7 +9,8 @@ SvelteKit application source root: HTML shell, global CSS, routes, and `$lib` mo
 ## Key Files
 | File | Description |
 |------|-------------|
-| `app.html` | HTML shell template (`%sveltekit.head%` / `%sveltekit.body%`, `data-sveltekit-preload-data="hover"`) |
+| `app.html` | HTML shell template (`%sveltekit.head%` / `%sveltekit.body%`, `data-sveltekit-preload-data="hover"`). An inline script stashes an early `beforeinstallprompt` in `window.__installPrompt` for `stores/install.svelte.js` |
+| `service-worker.js` | SvelteKit service worker (auto-registered at `${base}/service-worker.js`, scope `/PclToon/`). Precaches `build` + `files` + `prerendered` into `pcltoon-${version}`, activates immediately (`skipWaiting`) and deletes older caches, serves those paths cache-first (the shell `${base}/` covers every `?code=…` URL), offline navigations fall back to the shell. Ignores non-GET and cross-origin requests, so pCloud API calls and images always hit the network and are never cached |
 | `app.css` | `@import 'tailwindcss'` plus `--bg-primary` / `--text-primary` CSS variables with a `.dark` override |
 
 ## Subdirectories

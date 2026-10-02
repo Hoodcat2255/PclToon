@@ -8,10 +8,12 @@
 	import EpisodeList from '$lib/components/EpisodeList.svelte';
 	import ImageViewer from '$lib/components/ImageViewer.svelte';
 	import ReaderBar from '$lib/components/ReaderBar.svelte';
+	import InstallPrompt from '$lib/components/InstallPrompt.svelte';
 	import { extractCode, fetchPublicLink, classifyContents } from '$lib/pcloud.js';
 	import { parseSearch, buildSearch, resolvePath, defaultView } from '$lib/nav.js';
 	import { history as recent } from '$lib/stores/history.svelte.js';
 	import { readingMode } from '$lib/stores/reading-mode.svelte.js';
+	import { install } from '$lib/stores/install.svelte.js';
 
 	const HEADER_HIDE_OFFSET = 80;
 	const SCROLL_DELTA = 8;
@@ -154,6 +156,7 @@
 	onMount(() => {
 		recent.init();
 		readingMode.init();
+		install.init();
 	});
 
 	async function handleLinkSubmit(url) {
@@ -322,6 +325,8 @@
 					</ul>
 				</div>
 			{/if}
+
+			<InstallPrompt />
 		</div>
 	{:else if currentView === 'loading'}
 		<div class="flex items-center justify-center min-h-[60dvh] text-gray-500 dark:text-gray-400">

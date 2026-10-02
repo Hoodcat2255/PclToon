@@ -11,7 +11,7 @@
 			<stop offset="1" stop-color="#fff" stop-opacity="0.15" />
 		</linearGradient>
 	</defs>
-	<rect id="background" rx="112" width="512" height="512" fill="url(#bg)" />
+	<rect id="background" width="512" height="512" fill="url(#bg)" />
 	<g transform="translate(-24 6)">
 		<!-- Vertical strip of panels, the last one fading out as if scrolling on. -->
 		<rect x="160" y="104" width="168" height="100" rx="16" fill="#fff" />

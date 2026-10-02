@@ -7,7 +7,10 @@ export default defineConfig({
 	use: {
 		...devices['Pixel 7'],
 		// Preview serves the production build under the GitHub Pages base path.
-		baseURL: 'http://localhost:4173/PclToon/'
+		baseURL: 'http://localhost:4173/PclToon/',
+		// A cached app shell would outlive page.route mocks between tests;
+		// pwa.spec.js opts back in.
+		serviceWorkers: 'block'
 	},
 	webServer: {
 		command: 'NODE_ENV=production npm run build && npm run preview -- --port 4173 --strictPort',
